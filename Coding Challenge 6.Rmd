@@ -1,0 +1,146 @@
+---
+title: "Coding Challenge 6"
+author: "Dustyn Lewis"
+date: "2025-03-27"
+output: 
+  pdf_document:
+    keep_md: yes
+---
+
+##1) Regarding reproducibility, what is the main point of writing your own functions and iterations?
+
+-Writing your own functions and using iterations (loops) makes your code more reproducible by reducing repetition and human error. Instead of copying and pasting the same code many times, you encapsulate the logic in a function or a loop which is easier to maintain and share. Also, changes made in one place apply everywhere consistently.
+
+##2) In your own words, describe how to write a function and a for loop in R, including syntax, where to write code, and how results are returned:
+
+-A function in R is created with the function keyword, followed by parentheses containing parameters, and braces ({}) enclosing the code. For example: 
+```{R}
+my_function <- function(x, y) { # You can define functions at the top of                                   the script to be used throughout code
+  result <- x + y
+  return(result)                #"return()" states which caluess                                          function outputs
+}
+```
+-A for loop in R uses the for keyword, a variable in parentheses, and braces for the loop body. For example:
+```{R}
+for (i in 1:5) {                # Loops iterate over a collection of                                      items in your code (rows from a                                         dataframe)
+  print(i)
+}
+```
+
+##3) Read in "Cities.csv" as relative file path:
+
+-The data set contains 40 most populous cities plut Auburn, I've downloaded the data set into my working directory already.
+```{R}
+cities <- read.csv("Cities.csv")
+head(cities)
+```
+
+##4) Write a function to calculate distance between two pairs of coordinates using Haversine formul:
+
+-Input = "lat1, lon1, lat2, lon2"
+-Output = "distance_km"
+```{R}
+haversine_distance <- function(latA, lonA, latN, lonN) {
+  
+  # Convert degrees to radians
+  rad.latA <- latA * pi / 180
+  rad.lonA <- lonA * pi / 180
+  rad.latN <- latN * pi / 180
+  rad.lonN <- lonN * pi / 180
+  
+  # Differences
+  delta_lat <- rad.latN - rad.latA
+  delta_lon <- rad.lonN - rad.lonA
+  
+  # Haversine formula
+  a <- sin(delta_lat / 2)^2 + cos(rad.latA) * cos(rad.latN) * sin(delta_lon / 2)^2
+  c <- 2 * asin(sqrt(a))
+  
+  # Earth's radius in meters; convert to km
+  earth_radius <- 6378137
+  distance_km <- (earth_radius * c) / 1000
+  
+  return(distance_km)
+}
+```
+
+##5) Test function by computing distance between Auburn and NYC:
+
+-We need to identify rows for Auburn and NYC, extract lat/lon, apply "haversine_distance()", and print the results which we expext to be ~1367.854 km.
+
+```{R}
+# Filter or subset the data:
+Auburn <- subset(cities, city == "Auburn")
+NYC <- subset(cities, city == "New York")
+
+# Extract their lat/lon
+latA <- Auburn$lat
+lonA <- Auburn$long
+latN <- NYC$lat
+lonN <- NYC$long
+
+# Calculate the distance
+dist_auburn_nyc <- haversine_distance(latA, lonA, latN, lonN)
+dist_auburn_nyc
+```
+
+##6) Calculate distances between Auburn and all cities:
+
+-We will use a loop to compute distances between Auburn and all other cities similiar to the prior function, except we use "for (i in 1:nrow(cities)) {...}"
+
+```{R}
+# 1) Extract Auburn's lat/lon
+latA <- Auburn$lat
+lonA <- Auburn$long
+
+# 2) We will loop over all rows in "cities" EXCEPT Auburn's row, or skip if city is "Auburn".
+for (i in 1:nrow(cities)) {
+  if (cities$city[i] == "Auburn") {
+    next # skip Auburn itself
+  }
+  
+  lat2 <- cities$lat[i]
+  lon2 <- cities$long[i]
+  
+  dist_km <- haversine_distance(latA, lonA, lat2, lon2)
+  print(dist_km)
+}
+```
+
+##Bonus) Building a Dataframe
+
+-We can make a dataframe with three columns: City1|City2|Distance_km| where each time we loop over a city we append/add additionnal rows.
+
+```{R}
+# Create an empty data frame
+distance_df <- data.frame(city1 = character(),
+                          city2 = character(),
+                          Distance_km = numeric(),
+                          stringsAsFactors = FALSE)
+
+for (i in 1:nrow(cities)) {
+  if (cities$city[i] == "Auburn") next
+  
+  lat2 <- cities$lat[i]
+  lon2 <- cities$long[i]
+  
+  dist_km <- haversine_distance(latA, lonA, lat2, lon2)
+  
+  # Create a one-row data frame for the pair: (City i, Auburn)
+  new_row <- data.frame(city1 = cities$city[i],
+                        city2 = "Auburn",
+                        Distance_km = dist_km,
+                        stringsAsFactors = FALSE)
+  
+  # Append to the main data frame
+  distance_df <- rbind(distance_df, new_row)
+}
+
+# Print the first few rows
+head(distance_df)
+
+```
+
+##7) Commit and Push
+[GitHub](https://github.com/YourUsername/YourRepoName/tree/main/Coding%20Challenge%206)
+
