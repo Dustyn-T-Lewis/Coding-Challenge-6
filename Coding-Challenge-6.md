@@ -229,6 +229,6 @@ head(distance_df)
 ```
 
 ##7) Commit and Push
-[GitHub](https://github.com/YourUsername/YourRepoName/tree/main/Coding%20Challenge%206)
+[GitHub](https://github.com/Dustyn-T-Lewis/Coding-Challenge-6.git)
 
-https://github.com/YourUsername/YourRepoName/tree/main/Coding%20Challenge%206
+https://github.com/Dustyn-T-Lewis/Coding-Challenge-6.git
