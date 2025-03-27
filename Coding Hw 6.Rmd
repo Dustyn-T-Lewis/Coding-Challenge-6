@@ -1,0 +1,218 @@
+---
+title: "Iterations and Functions"
+author: "Dustyn Lewis"
+date: "2025-03-27"
+output: pdf_document
+---
+
+Loading Libraries
+
+```{r}
+library(ggplot2)
+library(drc) 
+library(tidyverse)
+library(dplyr)
+#install.packages("drc")
+library(drc)
+```
+
+We can use functions to streamline tasks that we may repeat several times. Here is an example of temperature conversion:
+
+```{r}
+F_to_C <- function(fahrenheit_temp){
+  celsius <- (5*(fahrenheit_temp - 32)/9)
+  return(celsius)
+}
+
+# F_to_C is our new function
+F_to_C(32)
+```
+
+The anatomy of a function is pretty simple, where we name using "<-" and followed by "function(...)" and then the functional bits of code which can include conditionals or straight forward functions go between "{}"
+
+```{r, eval=F}
+sample.function <- function(... variable goes here ...){
+  .... code goes here.... 
+  return(... output ...)
+}
+```
+
+Example: F = C x (9/5)+32
+
+```{r}
+C_to_F <- function(celsius){
+  fahrenheit_temp <- (celsius * (9/5) + 32)
+  return(fahrenheit_temp)
+}
+
+# F_to_C is our new function
+C_to_F(32)
+```
+
+Some functsion that are useful to generating new dataframes could be the "rep()" (repeat elements) or "seq()" (sequence numbers) or seq_along() (sequence numbers based on letters/non-integers)
+
+```{r}
+rep("A", 3) # repeats A three times 
+rep(c("A", "B"), 5) # repeats A and B, times 
+rep(c(1,2,3,4), times = 4) # repeats 1,2,3,4, 4 times 
+rep(c(1,2,5,2), times = 4, each = 4) # repeats 1 four times, 2 four times, 5 four times, and 2 four times. 
+
+seq(from = 1, to = 7) # sequence of numbers 1 to 7
+seq(from = 0, to = 10, by = 2) # sequence of numbers from 0 to 10 by 2s 
+
+# combined seq() and rep()
+rep(seq(from = 0, to = 10, by = 2), times = 3, each = 2)
+
+# use the built in LETTERS vector for an example. 
+LETTERS
+seq_along(LETTERS[1:5]) # will return 1,2,3,4,5 not the actual letters. 
+```
+
+This code goes through the numbers 1 through 10, one by one, multiplies each number by 2, and prints the result. So the output shows 2, 4, 6, …, 20.
+
+```{r}
+for (i in 1:10) {
+print(i*2)  
+}
+```
+
+For this example we can model fungicide sensitivity for a single isolate by fitting a dose-response curve using the drc package’s logistic model. The code extracts only the data for isolate ILSO_5-41c, fits the model, and then retrieves the EC50 (the fungicide concentration that cuts growth by 50%). Finally, it prints that EC50 value with its confidence interval information.
+```{r}
+# 1) Read in fungicide sensitivity data from "EC50.all.csv".
+getwd()
+EC50.data <- read.csv("EC50_all.csv")
+
+# 2) Use "drm()" from the "drc" package to fit a dose-response model
+#    for the isolate "ILSO_5-41c". The "~" separates the growth data (left side)
+#    from the fungicide concentrations (right side).
+isolate1 <- drm(
+  100 * EC50.data$relgrowth[EC50.data$is == "ILSO_5-41c"] ~ 
+    EC50.data$conc[EC50.data$is == "ILSO_5-41c"],
+  # "fct = LL.4()" indicates a 4-parameter logistic model.
+  # "names" simply labels the parameters, e.g. "EC50".
+  fct = LL.4(
+    fixed = c(NA, NA, NA, NA),
+    names = c("Slope", "Lower", "Upper", "EC50")
+  ),
+  # "na.action = na.omit" drops any rows with missing data.
+  na.action = na.omit
+)
+
+# 3) "summary()" gives a statistical summary (estimates, SE, etc.) of the model.
+#    We convert it to a data frame for easy viewing.
+summary.fit <- data.frame(summary(isolate1)[[3]])
+
+# 4) "ED()" extracts the Effective Dose at 50% (the EC50),
+#    meaning the concentration cutting growth by 50%.
+#    "type = 'relative'" sets the relative response, and "interval = 'delta'"
+#    gives confidence intervals using the delta method.
+EC50 <- ED(isolate1, respLev = 50, type = "relative", interval = "delta")[[1]]
+
+# 5) Print the EC50 value to see the concentration that reduces
+#    growth by 50% for isolate "ILSO_5-41c".
+EC50
+```
+
+By creating a list of isolate names, we can loop through each isolate, fit the model, and quickly retrieve the EC50 for every isolate.
+
+```{R}
+# We first gather unique isolate names into 'nm'.
+nm <- unique(EC50.data$is)
+
+# Loop over each isolate in 'nm' using seq_along().
+for (i in seq_along(nm)) {
+
+  # Subset the data for isolate nm[[i]] and fit a 4-parameter logistic model.
+  isolate1 <- drm(
+    100 * EC50.data$relgrowth[EC50.data$is == nm[[i]]] ~ 
+      EC50.data$conc[EC50.data$is == nm[[i]]],
+    fct = LL.4(fixed = c(NA, NA, NA, NA), names = c("Slope", "Lower", "Upper", "EC50")),
+    na.action = na.omit
+  )
+  
+  # Summarize the model's parameter estimates.
+  summary.fit <- data.frame(summary(isolate1)[[3]])
+  
+  # Calculate the fungicide concentration that reduces growth by 50% (EC50).
+  EC50 <- ED(isolate1, respLev = 50, type = "relative", interval = "delta")[[1]]
+  
+  EC50 
+}
+
+```
+
+We have multiple fungal isolates, each of which needs a fungicide dose–response model fit to determine its EC50 (the fungicide concentration that reduces growth by 50%). Instead of manually running the model for each isolate, we loop through a list of isolate names (nm) and fit the model automatically using drm() from the drc package. Within each iteration, we extract the EC50 estimate for that isolate and store it as a new row in a data frame (EC50.ll4). 
+This approach is both reproducible and efficient, because any new or modified isolates can be included simply by re-running the loop—no copy–pasting required. The resulting data frame of isolates and their EC50 values can then be used for plots, statistical comparisons, or further analyses, making it an ideal workflow for publications or large datasets.
+
+```{R}
+# 1) Create an empty (NULL) data frame to store results:
+EC50.ll4 <- NULL
+
+# 2) Loop over every isolate name in "nm", just like before.
+for (i in seq_along(nm)) {
+  
+  # 3) Subset rows for the isolate "nm[[i]]" and fit the logistic model (LL.4).
+  isolate1 <- drm(
+    100 * EC50.data$relgrowth[EC50.data$is == nm[[i]]] ~
+      EC50.data$conc[EC50.data$is == nm[[i]]],
+    fct = LL.4(
+      fixed = c(NA, NA, NA, NA),
+      names = c("Slope", "Lower", "Upper", "EC50")
+    ),
+    na.action = na.omit
+  )
+  
+  # 4) Summarize the model's fit. Not strictly needed for the final dataset, 
+  #    but can be helpful for checking parameter estimates.
+  summary.fit <- data.frame(summary(isolate1)[[3]])
+  
+  # 5) Extract the EC50 value (the fungicide concentration that reduces growth by 50%).
+  EC50 <- ED(isolate1, respLev = 50, type = "relative", interval = "delta")[[1]]
+  
+  # 6) Create a one-row data frame with the isolate name and its EC50.
+  isolate.ec_i <- data.frame(nm[[i]], EC50)
+  colnames(isolate.ec_i) <- c("Isolate", "EC50")
+  
+  # 7) Append ("rbind") the current row to our main data frame (EC50.ll4).
+  #    Each loop adds one row for the isolate being processed.
+  EC50.ll4 <- rbind.data.frame(EC50.ll4, isolate.ec_i)
+}
+
+# After the loop, "EC50.ll4" contains all isolates' names and their respective EC50 values.
+
+```
+
+We have a final dataset with EC50 data contained within `EC50.ll4` that was appended with each isolate upon each iteration which can be used for a plot: 
+
+```{R}
+ggplot(EC50.ll4, aes(x = EC50)) +
+  geom_histogram() +
+  theme_classic()
+```
+
+We can use "map()" function to contain everything in the same R object. So, we are grouping by isolate to handle each isolate data separately, then nesting data into a list column, then using "map()" to model each isolates data, then extracting EC50 from each model, then unnesting final column to get a single row per isolate with EC50.
+
+```{r}
+EC50.data %>%
+  # 1) Group by isolate (the variable we want to iterate over)
+  group_by(is) %>%
+  
+  # 2) "nest()" collapses each isolate's rows into a single list entry
+  nest() %>%
+  
+  # 3) "mutate()" adds a new column, "ll.4.mod", 
+  #    which stores the fitted model for each isolate using "map()"
+  mutate(ll.4.mod = map(data, ~ drm(.$relgrowth ~ .$conc,
+                                    fct = LL.4(fixed = c(NA, NA, NA, NA),
+                                               names = c("Slope", "Lower", "Upper", "EC50"))))) %>%
+  
+  # 4) Create another column "ec50" by mapping over each fitted model,
+  #    and extracting the 50% effective dose (EC50)
+  mutate(ec50 = map(ll.4.mod, ~ ED(.,
+                                   respLev = 50,
+                                   type = "relative",
+                                   interval = "delta")[[1]])) %>%
+  
+  # 5) "unnest()" flattens the "ec50" list column into a regular numeric column
+  unnest(ec50)
+```
